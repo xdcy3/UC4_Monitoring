@@ -1,0 +1,99 @@
+name: UC4 Daily Full Suite
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  uc4-full-suite:
+    runs-on: windows-latest
+    timeout-minutes: 180
+
+    env:
+      CI: true
+      UC4USERNAME: ${{ secrets.UC4USERNAME }}
+      UC4PASSWORD: ${{ secrets.UC4PASSWORD }}
+      EMAIL_USER: ${{ secrets.EMAIL_USER }}
+      EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+      EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      GOOGLE_APPS_SCRIPT_URL: ${{ secrets.GOOGLE_APPS_SCRIPT_URL }}
+      GOOGLE_SHEET_TAB: ${{ secrets.GOOGLE_SHEET_TAB }}
+      TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: 'UC4_Automation_Suite - share/package-lock.json'
+
+      - name: Install test dependencies
+        working-directory: 'UC4_Automation_Suite - share'
+        run: |
+          npm ci
+          npx playwright install chromium
+
+      - name: Run UC4 full suite
+        id: test_run
+        working-directory: 'UC4_Automation_Suite - share'
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $maxAttempts = 2
+          $attempt = 1
+          while ($attempt -le $maxAttempts) {
+            Write-Host "Running UC4 suite attempt $attempt of $maxAttempts"
+            npx playwright test tests/FullSuiteRun.spec.js --config=playwright.config.js
+            if ($LASTEXITCODE -eq 0) {
+              exit 0
+            }
+            if ($attempt -eq $maxAttempts) {
+              exit $LASTEXITCODE
+            }
+            $attempt += 1
+            Write-Host "Previous attempt failed; retrying..."
+          }
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uc4-artifacts
+          path: |
+            UC4_Automation_Suite - share/playwright-report/
+            UC4_Automation_Suite - share/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Notify Teams and Slack
+        if: always()
+        shell: pwsh
+        env:
+          RUN_OUTCOME: ${{ steps.test_run.outcome }}
+        run: |
+          $status = if ($env:RUN_OUTCOME -eq 'success') { '✅ Success' } else { '❌ Failed' }
+          $message = "UC4 daily suite $status. Workflow: $env:GITHUB_WORKFLOW | Run: $env:GITHUB_RUN_ID"
+
+          if (-not [string]::IsNullOrWhiteSpace('${{ secrets.TEAMS_WEBHOOK_URL }}')) {
+            $body = @{ text = $message } | ConvertTo-Json -Compress
+            try {
+              Invoke-RestMethod -Method Post -Uri '${{ secrets.TEAMS_WEBHOOK_URL }}' -ContentType 'application/json' -Body $body | Out-Null
+            } catch {
+              Write-Host "Teams notification failed: $($_.Exception.Message)"
+            }
+          }
+
+          if (-not [string]::IsNullOrWhiteSpace('${{ secrets.SLACK_WEBHOOK_URL }}')) {
+            $body = @{ text = $message } | ConvertTo-Json -Compress
+            try {
+              Invoke-RestMethod -Method Post -Uri '${{ secrets.SLACK_WEBHOOK_URL }}' -ContentType 'application/json' -Body $body | Out-Null
+            } catch {
+              Write-Host "Slack notification failed: $($_.Exception.Message)"
+            }
+          }
