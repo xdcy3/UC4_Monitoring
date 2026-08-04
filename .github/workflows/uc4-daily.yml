@@ -12,6 +12,8 @@ jobs:
 
     env:
       CI: true
+      TEMP: C:\temp
+      TMP: C:\temp
       UC4USERNAME: ${{ secrets.UC4USERNAME }}
       UC4PASSWORD: ${{ secrets.UC4PASSWORD }}
       EMAIL_USER: ${{ secrets.EMAIL_USER }}
@@ -25,6 +27,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Create temp directory on C drive
+        shell: pwsh
+        run: |
+          $tempPath = "C:\temp"
+          if (-not (Test-Path $tempPath)) {
+            New-Item -ItemType Directory -Path $tempPath -Force | Out-Null
+          }
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
