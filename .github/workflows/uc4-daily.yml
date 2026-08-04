@@ -41,37 +41,59 @@ jobs:
         with:
           node-version: 20
 
+      - name: Debug - List workspace contents
+        shell: pwsh
+        run: |
+          Write-Host "Current directory: $(Get-Location)"
+          Write-Host "Github workspace: ${{ github.workspace }}"
+          Write-Host "Contents of github.workspace:"
+          Get-ChildItem -Path "${{ github.workspace }}" -Recurse -Depth 2 | Select-Object -Property FullName | Format-List
+
       - name: Install test dependencies
         shell: pwsh
         run: |
-          Push-Location "${{ github.workspace }}\UC4_Automation_Suite - share"
-          npm ci
-          npx playwright install chromium
-          Pop-Location
+          $folder = Get-ChildItem -Path "${{ github.workspace }}" -Filter "*UC4_Automation_Suite*" -Directory -Recurse | Select-Object -First 1
+          if ($folder) {
+            Write-Host "Found folder at: $($folder.FullName)"
+            Push-Location $folder.FullName
+            npm ci
+            npx playwright install chromium
+            Pop-Location
+          } else {
+            Write-Error "Could not find UC4_Automation_Suite folder"
+            exit 1
+          }
 
       - name: Run UC4 full suite
         id: test_run
         shell: pwsh
         continue-on-error: true
         run: |
-          Push-Location "${{ github.workspace }}\UC4_Automation_Suite - share"
-          $maxAttempts = 2
-          $attempt = 1
-          while ($attempt -le $maxAttempts) {
-            Write-Host "Running UC4 suite attempt $attempt of $maxAttempts"
-            npx playwright test tests/FullSuiteRun.spec.js --config=playwright.config.js
-            if ($LASTEXITCODE -eq 0) {
-              Pop-Location
-              exit 0
+          $folder = Get-ChildItem -Path "${{ github.workspace }}" -Filter "*UC4_Automation_Suite*" -Directory -Recurse | Select-Object -First 1
+          if ($folder) {
+            Write-Host "Found folder at: $($folder.FullName)"
+            Push-Location $folder.FullName
+            $maxAttempts = 2
+            $attempt = 1
+            while ($attempt -le $maxAttempts) {
+              Write-Host "Running UC4 suite attempt $attempt of $maxAttempts"
+              npx playwright test tests/FullSuiteRun.spec.js --config=playwright.config.js
+              if ($LASTEXITCODE -eq 0) {
+                Pop-Location
+                exit 0
+              }
+              if ($attempt -eq $maxAttempts) {
+                Pop-Location
+                exit $LASTEXITCODE
+              }
+              $attempt += 1
+              Write-Host "Previous attempt failed; retrying..."
             }
-            if ($attempt -eq $maxAttempts) {
-              Pop-Location
-              exit $LASTEXITCODE
-            }
-            $attempt += 1
-            Write-Host "Previous attempt failed; retrying..."
+            Pop-Location
+          } else {
+            Write-Error "Could not find UC4_Automation_Suite folder"
+            exit 1
           }
-          Pop-Location
 
       - name: Upload test artifacts
         if: always()
