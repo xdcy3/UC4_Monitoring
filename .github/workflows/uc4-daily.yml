@@ -12,8 +12,6 @@ jobs:
 
     env:
       CI: true
-      TEMP: C:\temp
-      TMP: C:\temp
       UC4USERNAME: ${{ secrets.UC4USERNAME }}
       UC4PASSWORD: ${{ secrets.UC4PASSWORD }}
       EMAIL_USER: ${{ secrets.EMAIL_USER }}
@@ -28,72 +26,42 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create temp directory on C drive
-        shell: pwsh
-        run: |
-          $tempPath = "C:\temp"
-          if (-not (Test-Path $tempPath)) {
-            New-Item -ItemType Directory -Path $tempPath -Force | Out-Null
-          }
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Debug - List workspace contents
-        shell: pwsh
-        run: |
-          Write-Host "Current directory: $(Get-Location)"
-          Write-Host "Github workspace: ${{ github.workspace }}"
-          Write-Host "Contents of github.workspace:"
-          Get-ChildItem -Path "${{ github.workspace }}" -Recurse -Depth 2 | Select-Object -Property FullName | Format-List
-
       - name: Install test dependencies
         shell: pwsh
         run: |
-          $folder = Get-ChildItem -Path "${{ github.workspace }}" -Filter "*UC4_Automation_Suite*" -Directory -Recurse | Select-Object -First 1
-          if ($folder) {
-            Write-Host "Found folder at: $($folder.FullName)"
-            Push-Location $folder.FullName
-            npm ci
-            npx playwright install chromium
-            Pop-Location
-          } else {
-            Write-Error "Could not find UC4_Automation_Suite folder"
-            exit 1
-          }
+          Push-Location './UC4_Automation_Suite - share'
+          npm ci
+          npx playwright install chromium
+          Pop-Location
 
       - name: Run UC4 full suite
         id: test_run
         shell: pwsh
         continue-on-error: true
         run: |
-          $folder = Get-ChildItem -Path "${{ github.workspace }}" -Filter "*UC4_Automation_Suite*" -Directory -Recurse | Select-Object -First 1
-          if ($folder) {
-            Write-Host "Found folder at: $($folder.FullName)"
-            Push-Location $folder.FullName
-            $maxAttempts = 2
-            $attempt = 1
-            while ($attempt -le $maxAttempts) {
-              Write-Host "Running UC4 suite attempt $attempt of $maxAttempts"
-              npx playwright test tests/FullSuiteRun.spec.js --config=playwright.config.js
-              if ($LASTEXITCODE -eq 0) {
-                Pop-Location
-                exit 0
-              }
-              if ($attempt -eq $maxAttempts) {
-                Pop-Location
-                exit $LASTEXITCODE
-              }
-              $attempt += 1
-              Write-Host "Previous attempt failed; retrying..."
+          Push-Location './UC4_Automation_Suite - share'
+          $maxAttempts = 2
+          $attempt = 1
+          while ($attempt -le $maxAttempts) {
+            Write-Host "Running UC4 suite attempt $attempt of $maxAttempts"
+            npx playwright test tests/FullSuiteRun.spec.js --config=playwright.config.js
+            if ($LASTEXITCODE -eq 0) {
+              Pop-Location
+              exit 0
             }
-            Pop-Location
-          } else {
-            Write-Error "Could not find UC4_Automation_Suite folder"
-            exit 1
+            if ($attempt -eq $maxAttempts) {
+              Pop-Location
+              exit $LASTEXITCODE
+            }
+            $attempt += 1
+            Write-Host "Previous attempt failed; retrying..."
           }
+          Pop-Location
 
       - name: Upload test artifacts
         if: always()
