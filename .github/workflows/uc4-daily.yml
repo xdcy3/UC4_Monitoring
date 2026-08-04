@@ -44,30 +44,34 @@ jobs:
       - name: Install test dependencies
         shell: pwsh
         run: |
-          cd ".\UC4_Automation_Suite - share"
+          Push-Location "${{ github.workspace }}\UC4_Automation_Suite - share"
           npm ci
           npx playwright install chromium
+          Pop-Location
 
       - name: Run UC4 full suite
         id: test_run
         shell: pwsh
         continue-on-error: true
         run: |
-          cd ".\UC4_Automation_Suite - share"
+          Push-Location "${{ github.workspace }}\UC4_Automation_Suite - share"
           $maxAttempts = 2
           $attempt = 1
           while ($attempt -le $maxAttempts) {
             Write-Host "Running UC4 suite attempt $attempt of $maxAttempts"
             npx playwright test tests/FullSuiteRun.spec.js --config=playwright.config.js
             if ($LASTEXITCODE -eq 0) {
+              Pop-Location
               exit 0
             }
             if ($attempt -eq $maxAttempts) {
+              Pop-Location
               exit $LASTEXITCODE
             }
             $attempt += 1
             Write-Host "Previous attempt failed; retrying..."
           }
+          Pop-Location
 
       - name: Upload test artifacts
         if: always()
