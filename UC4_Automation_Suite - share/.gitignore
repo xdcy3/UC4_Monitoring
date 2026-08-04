@@ -1,0 +1,20 @@
+# Node dependencies
+node_modules/
+
+# Passwords and Secrets
+.env*
+!.env.template
+
+# Playwright auto-generated testing folders
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Daily Output Files (Do not push daily runs to GitHub)
+test-data/*.pdf
+test-data/*.html
+test-data/failed_*.csv
+test-data/all_jobs_log.csv
+test-data/dc_jobs_log.csv
+logs/
+scheduler.log
