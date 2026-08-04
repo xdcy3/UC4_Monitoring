@@ -34,7 +34,7 @@ jobs:
       - name: Install test dependencies
         shell: bash
         run: |
-          cd "UC4_Automation_Suite - share"
+          cd "${GITHUB_WORKSPACE}/UC4_Automation_Suite - share"
           npm ci
           npx playwright install chromium
 
@@ -43,7 +43,7 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
-          cd "UC4_Automation_Suite - share"
+          cd "${GITHUB_WORKSPACE}/UC4_Automation_Suite - share"
           maxAttempts=2
           attempt=1
           while [ $attempt -le $maxAttempts ]; do
