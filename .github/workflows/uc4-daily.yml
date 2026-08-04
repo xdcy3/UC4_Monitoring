@@ -32,32 +32,32 @@ jobs:
           node-version: 20
 
       - name: Install test dependencies
-        shell: bash
+        shell: pwsh
         run: |
-          cd "${GITHUB_WORKSPACE}/UC4_Automation_Suite - share"
+          cd "${{ github.workspace }}\UC4_Automation_Suite - share"
           npm ci
           npx playwright install chromium
 
       - name: Run UC4 full suite
         id: test_run
-        shell: bash
+        shell: pwsh
         continue-on-error: true
         run: |
-          cd "${GITHUB_WORKSPACE}/UC4_Automation_Suite - share"
-          maxAttempts=2
-          attempt=1
-          while [ $attempt -le $maxAttempts ]; do
-            echo "Running UC4 suite attempt $attempt of $maxAttempts"
+          cd "${{ github.workspace }}\UC4_Automation_Suite - share"
+          $maxAttempts = 2
+          $attempt = 1
+          while ($attempt -le $maxAttempts) {
+            Write-Host "Running UC4 suite attempt $attempt of $maxAttempts"
             npx playwright test tests/FullSuiteRun.spec.js --config=playwright.config.js
-            if [ $? -eq 0 ]; then
+            if ($LASTEXITCODE -eq 0) {
               exit 0
-            fi
-            if [ $attempt -eq $maxAttempts ]; then
-              exit $?
-            fi
-            attempt=$((attempt + 1))
-            echo "Previous attempt failed; retrying..."
-          done
+            }
+            if ($attempt -eq $maxAttempts) {
+              exit $LASTEXITCODE
+            }
+            $attempt += 1
+            Write-Host "Previous attempt failed; retrying..."
+          }
 
       - name: Upload test artifacts
         if: always()
